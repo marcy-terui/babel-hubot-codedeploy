@@ -1,0 +1,20 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /opt/hubot/
+permissions:
+  - object: /opt/hubot
+    pattern: "**"
+    owner: hubot
+    group: hubot
+    mode: 755
+hooks:
+  ApplicationStop:
+    - location: bin/hubot_stop
+      timeout: 300
+      runas: hubot
+  ApplicationStart:
+    - location: bin/hubot_start
+      timeout: 300
+      runas: hubot

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+APP_DIR=/opt/hubot
+export PATH="$APP_DIR/node_modules/.bin:$APP_DIR/node_modules/hubot/node_modules/.bin:$PATH"
+forever stopall

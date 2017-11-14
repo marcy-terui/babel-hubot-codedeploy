@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set -e
+
+APP_DIR=/opt/hubot
+cd $APP_DIR
+npm install
+export PATH="$APP_DIR/node_modules/.bin:$APP_DIR/node_modules/hubot/node_modules/.bin:$PATH"
+export HUBOT_SLACK_TOKEN=$(aws kms decrypt --region us-west-2 --ciphertext-blob fileb://encrypted-slack-token.txt --query Plaintext --output text | base64 --decode)
+forever start --workingDir $APP_DIR $APP_DIR/node_modules/.bin/babel-hubot --name "orthros-bot" --adapter slack

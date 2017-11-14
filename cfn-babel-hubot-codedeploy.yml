@@ -1,0 +1,121 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: orthros bot template
+Resources:
+  BabelHubotKey:
+    Type: "AWS::KMS::Key"
+    Properties:
+      Description: "Hubot Encription key"
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: "orthros-bot-admin"
+        Statement:
+          - Sid: "Allow administration of the key from GUI"
+            Effect: "Allow"
+            Principal:
+              AWS: "arn:aws:iam::123456789:role/gui-role"
+            Action:
+              - "kms:*"
+            Resource: "*"
+          - Sid: "Allow administration of the key from CLI"
+            Effect: "Allow"
+            Principal:
+              AWS: "arn:aws:iam::123456789:user/cli-user"
+            Action:
+              - "kms:*"
+            Resource: "*"
+          - Sid: "Allow use of the key"
+            Effect: "Allow"
+            Principal:
+              AWS: !GetAtt BabelHubotRole.Arn
+            Action:
+              - "kms:Decrypt"
+              - "kms:ReEncrypt*"
+              - "kms:GenerateDataKey*"
+              - "kms:DescribeKey"
+            Resource: "*"
+  BabelHubotRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      RoleName: BabelHubotRole
+      Policies:
+        - PolicyName: "kms-decrypt-only"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: "kms:Decrypt"
+                Resource: "*"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
+  BabelHubotProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref BabelHubotRole
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      IamInstanceProfile: !Ref BabelHubotProfile
+      SecurityGroups:
+      - !Ref InstanceSecurityGroup
+      KeyName: babel-hubot-codedeploy
+      ImageId: ami-32d8124a
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+            - ""
+            - [
+                "#! /bin/bash\n",
+                "yum update -y\n",
+                "curl --silent --location https://rpm.nodesource.com/setup_6.x | bash -\n",
+                "yum install -y nodejs\n",
+                "yum install -y redis --enablerepo=epel\n",
+                "/sbin/service redis start\n",
+                "/sbin/chkconfig redis on\n",
+                "useradd hubot\n",
+                "mkdir -p /opt/hubot\n",
+                "chown -R hubot:hubot /opt/hubot\n",
+                "yum install -y ruby\n",
+                "cd /home/ec2-user\n",
+                "curl -O https://aws-codedeploy-us-west-2.s3.amazonaws.com/latest/install\n",
+                "chmod +x ./install\n",
+                "./install auto\n"
+              ]
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: 0.0.0.0/0
+Outputs:
+  InstanceId:
+    Description: InstanceId of the newly created EC2 instance
+    Value: !Ref EC2Instance
+  AZ:
+    Description: Availability Zone of the newly created EC2 instance
+    Value: !GetAtt EC2Instance.AvailabilityZone
+  PublicDNS:
+    Description: Public DNSName of the newly created EC2 instance
+    Value: !GetAtt EC2Instance.PublicDnsName
+  PublicIP:
+    Description: Public IP address of the newly created EC2 instance
+    Value: !GetAtt EC2Instance.PublicIp
+  KeyArn:
+    Description: ARN of the newly created KMS Key
+    Value: !GetAtt BabelHubotKey.Arn
